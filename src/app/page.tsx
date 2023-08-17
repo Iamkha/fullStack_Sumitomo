@@ -1,113 +1,199 @@
-import Image from 'next/image'
+"use client";
+import * as React from "react";
+import {
+  Grid,
+  Typography,
+  Box,
+  Button,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  InputLabel,
+} from "@mui/material";
+import DatePicker, { DateObject } from "react-multi-date-picker";
+import InputIcon from "react-multi-date-picker/components/input_icon";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import Paper from "@mui/material/Paper";
+import { styled } from "@mui/material/styles";
+import { useSelector } from "react-redux";
+import { socket } from "./socket";
+import Icons from "../components/icons";
+import DATA_DASHBOARD from "../components/utils/helper/dataDashboard";
+import { RootState } from "./store";
+import Layout from "@/components/layout";
+import { useParams } from "next/navigation";
+import axios from "axios";
+import Cookies from "js-cookie";
 
-export default function Home() {
+const Block = styled(Paper)(({ color }: any) => ({
+  height: 200,
+  lineHeight: "60px",
+  padding: 10,
+  borderRadius: "15px",
+  backgroundColor: color,
+}));
+
+const Home = () => {
+  const param = useParams();
+
+  const statusDrawer = useSelector(
+    (state: RootState) => state.user.statusDrawer
+  );
+  const [data, setData] = React.useState<any>({});
+  const [dateTime, setDateTime] = React.useState({ from: "", to: "" });
+  const [dataDate, setDataDate] = React.useState({});
+
+  const fetchAPi = async () => {
+    try {
+      const data = await axios("api/v1/document/summary", {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${Cookies.get("token")}`,
+        },
+        method: "POST",
+        data: JSON.stringify(dataDate),
+      });
+      if (data.data) {
+        setData(data.data.data);
+      }
+    } catch (e: any) {
+      (err: any) => console.log("Error Dasboard: " + err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchAPi();
+  }, [dataDate]);
+
+  const handleSearch = (e: any, key: any) => {
+    const value = new DateObject(e).format(`YYYY-MM-DD`);
+    setDateTime((preState) => ({
+      ...preState,
+      [key]: value,
+    }));
+  };
+
+  const handleSearchDate = () => {
+    setDataDate(dateTime);
+  };
+
+  React.useEffect(() => {
+    const cb = (resp: any) => {
+      setData(resp);
+    };
+    socket.on("sever:sendAllDocuments", cb);
+
+    return () => {
+      socket.off("sever:sendAllDocuments", cb);
+    };
+  }, []);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div>
+      <Layout pathname={"/"}>
+        <Box style={{ marginTop: "30px" }}>
+          <Accordion sx={{ marginBottom: "16px" }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography
+                sx={{ fontWeight: "bold", color: "#4c4e64de" }}
+                variant={"h5"}
+              >
+                Search Criteria
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box className={"grid grid-cols-2 gap-4 mb-4"}>
+                <Box
+                  sx={{ display: "flex", gap: "10px", flexDirection: "column" }}
+                >
+                  <InputLabel>Date Range:</InputLabel>
+                  <Box display={"flex"} gap={"20px"}>
+                    <DatePicker
+                      onChange={(e) => {
+                        handleSearch(e, "from");
+                      }}
+                      containerClassName={
+                        "w-full rounded [&>div>div>input]:w-full [&>div>div>input]:h-[55px]"
+                      }
+                      inputClass={
+                        "h-[56px] w-full rounded border-[#ccc] border-[1px] border-[solid] py-[14.5px] px-[14px]"
+                      }
+                      format={"YYYY-MM-DD"}
+                      range={false}
+                      render={<InputIcon />}
+                      placeholder={"from"}
+                      calendarPosition={"bottom-end "}
+                    />
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Icons name="rightArrow" />
+                    </Box>
+                    <DatePicker
+                      onChange={(e: any) => {
+                        handleSearch(e, "to");
+                      }}
+                      containerClassName={
+                        "w-full rounded [&>div>div>input]:w-full [&>div>div>input]:h-[55px]"
+                      }
+                      inputClass={
+                        "h-[56px] w-full rounded border-[#ccc] border-[1px] border-[solid] py-[14.5px] px-[14px]"
+                      }
+                      format={"YYYY-MM-DD"}
+                      range={false}
+                      render={<InputIcon />}
+                      placeholder={"to"}
+                      calendarPosition={"bottom-end "}
+                    />
+                  </Box>
+                </Box>
+              </Box>
+              <Box className="flex justify-end w-full">
+                <Button
+                  onClick={handleSearchDate}
+                  fullWidth
+                  className="bg-blue-500"
+                  variant="contained"
+                  sx={{ mt: 3, mb: 2, width: "300px" }}
+                >
+                  Search
+                </Button>
+              </Box>
+            </AccordionDetails>
+          </Accordion>
+          <Grid
+            container
+            spacing={3}
+            className={"w-full"}
+            justifyContent={statusDrawer ? "space-between" : "center"}
           >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+            {DATA_DASHBOARD.map((dt: any, index: number) => (
+              <Grid key={index} item xs={3}>
+                <Block elevation={3} color={dt.colorBackground}>
+                  <Typography variant="subtitle2" color={dt.colorText}>
+                    {dt.title}
+                  </Typography>
+                  <Box className="flex justify-center items-center h-[calc(100%_-_40px)]">
+                    <Typography
+                      variant="h2"
+                      fontWeight={"800"}
+                      color={dt.colorText}
+                    >
+                      {data && data[dt.key] ? data[dt.key] : 0}
+                    </Typography>
+                  </Box>
+                </Block>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      </Layout>
+    </div>
+  );
+};
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
-}
+export default Home;
