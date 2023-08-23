@@ -2,19 +2,8 @@ import * as React from "react";
 import { cloneDeep, get } from "lodash";
 
 // Request defination
-import { getRequest } from "src/utils/axios";
-import {
-  DOCUMENT_ENDPOINT,
-  INVOICE_ENDPOINT,
-  KV_ENDPOINT,
-  PDFHEADER_ENDPOINT,
-} from "src/utils/endpoint";
-
-import { INVOICE_TABLE_CONFIG } from "src/table-config/invoices";
-import type { EtableConfigType } from "src/utils/types/etable-config";
 
 import Box from "@mui/material/Box";
-import { Link, useNavigate } from "react-router-dom";
 import { Grid, Button, CircularProgress, Tabs, Tab } from "@mui/material";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
@@ -26,13 +15,19 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import MuiTable from "@mui/material/Table";
 
-import { convertRowValue } from "src/utils/helper/table";
 import logo from "../../assets/images/small-logo.jpg";
 import EditableText from "../editable-text";
 import Icons from "../icons";
-import { useNotification } from "~/hooks/notification/use-notification";
-import PDFViewer from "../pdf-viewer";
 import { PDFDocument } from "pdf-lib";
+import { convertRowValue } from "../utils/helper/table";
+import Link from "next/link";
+import { INVOICE_ENDPOINT, PDFHEADER_ENDPOINT } from "../utils/endpoint";
+import { useNotification } from "../hooks/notification/use-notification";
+import PDFViewer from "@/pdf-viewer";
+import { EtableConfigType } from "../utils/types/etable-config";
+import axios from "axios";
+import Cookies from "js-cookie";
+import { useRouter } from "next/navigation";
 
 const excludeInfomation = [
   "invoice_id",
@@ -185,11 +180,14 @@ const Detail = ({
   const [mappedDataLabel, setMappedDataLabel] = React.useState({});
   const [pdf, setPdf] = React.useState<any>(null);
   const [url, setUrl] = React.useState<string>("");
+  console.log(url, "url");
+  console.log(data);
+
   const [pdfHeader, setPdfHeader] = React.useState(null);
   const [mergePdfBase64, setMergePdfBase64] = React.useState<string>("");
-  const request = getRequest();
-  const navigate = useNavigate();
   const { showNotification } = useNotification();
+  const router = useRouter();
+  console.log(data);
 
   const optionsTab: any = {
     0: listHeaderDetail,
@@ -249,7 +247,7 @@ const Detail = ({
             >
               {el.link ? (
                 <Link
-                  to={
+                  href={
                     location.pathname.replace(/\/$/, "") +
                     `/${row.id || row[el.colId]}`
                   }
@@ -289,44 +287,90 @@ const Detail = ({
       );
     return amount ? amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,") : "";
   }, [data]);
-
-  React.useEffect(() => {
-    const search = JSON.parse(String(localStorage.getItem("searchCriteria")));
-    const searchInvoices = get(search, ["invoices"], []);
-    request
-      .post(INVOICE_ENDPOINT + `/${id}`, {
-        filters: searchInvoices,
-      })
-      .then((res: any) => {
-        if (!res.data.error) {
-          setData(res.data.data || {});
-          setOriginalData(res.data.data || {});
-          request
-            .get(DOCUMENT_ENDPOINT + `/${res.data.data.documentId}`)
-            .then(({ data }: any) => {
-              if (!data.error) {
-                if (res.data.data?.pdf) {
-                  setPdf(res.data.data?.pdf);
-                } else {
-                  setPdf(data.data);
-                }
-              }
-            });
-
-          request
-            .get(PDFHEADER_ENDPOINT + `/${res.data.data.documentId}`)
-            .then(({ data }: any) => {
-              if (!data.error) {
-                if (data.data && data.data?.[0]) {
-                  setPdfHeader(data.data?.[0]?.pdf);
-                }
-              }
-            });
+  const fetchApi = async (searchInvoices: any) => {
+    try {
+      const data = await axios(
+        process.env.NEXT_PUBLIC_API_URL + "/api/v1/invoices" + `/${id}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Cookies.get("token")}`,
+          },
+          method: "POST",
+          data: JSON.stringify({
+            filters: searchInvoices,
+          }),
         }
-      });
-    request.get(KV_ENDPOINT + `/templateMappingFields`).then((res: any) => {
-      if (!res.data.error) {
-        const labels = res.data.data.reduce(
+      );
+      setData(data.data.data || {});
+      setOriginalData(data.data.data || {});
+      if (data.data.data.documentId) {
+        try {
+          const resss = await axios(
+            process.env.NEXT_PUBLIC_API_URL +
+              "/api/v1/document" +
+              `/${data.data.data.documentId}`,
+            {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Cookies.get("token")}`,
+              },
+              method: "GET",
+            }
+          );
+          if (resss.data.data.data) {
+            if (data.data.data?.pdf) {
+              setPdf(data.data.data?.pdf);
+            } else {
+              setPdf(resss.data.data.data);
+            }
+          }
+        } catch (error) {}
+
+        try {
+          const res = await axios(
+            process.env.NEXT_PUBLIC_API_URL +
+              "/api/v1/pdf-header" +
+              `/${data.data.data.documentId}`,
+            {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Cookies.get("token")}`,
+              },
+              method: "GET",
+            }
+          );
+          console.log(res.data.data.data);
+
+          if (res.data.data.data) {
+            setPdfHeader(res.data.data.data);
+          }
+          if (res.data.data.data) {
+            if (data.data.data?.pdf) {
+              setPdf(data.data.data?.pdf);
+            } else {
+              setPdf(res.data.data.data);
+            }
+          }
+        } catch (error) {}
+      }
+    } catch (error) {}
+  };
+  const fetchApiKv = async () => {
+    try {
+      const data = await axios(
+        process.env.NEXT_PUBLIC_API_URL + "/api/v1/kv/templateMappingFields",
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Cookies.get("token")}`,
+          },
+          method: "GET",
+        }
+      );
+
+      if (!data.data.error) {
+        const labels = data.data.data.reduce(
           (a: any, b: any) => {
             return {
               ...a,
@@ -340,7 +384,30 @@ const Detail = ({
         );
         setMappedDataLabel(labels);
       }
-    });
+    } catch (error) {}
+  };
+  React.useEffect(() => {
+    const search = JSON.parse(String(localStorage.getItem("searchCriteria")));
+    const searchInvoices = get(search, ["invoices"], []);
+    fetchApi(searchInvoices);
+    fetchApiKv();
+    // request.get(KV_ENDPOINT + `/templateMappingFields`).then((res: any) => {
+    //   if (!res.data.error) {
+    //     const labels = res.data.data.reduce(
+    //       (a: any, b: any) => {
+    //         return {
+    //           ...a,
+    //           [b.value]: b.label,
+    //         };
+    //       },
+    //       {
+    //         companyName: "Vendor Name",
+    //         createdAt: "Created At",
+    //       }
+    //     );
+    //     setMappedDataLabel(labels);
+    //   }
+    // });
   }, [id]);
 
   React.useEffect(() => {
@@ -367,63 +434,130 @@ const Detail = ({
     });
   };
 
-  const handleSaveInvoice = () => {
-    setLoading(true);
-    request
-      .post("/invoice/sendToSap", { invoiceId: data._id, pdf })
-      .then((res: any) => {
-        if (!res.data.error) {
-          request
-            .put("/invoice/" + data._id, { data, _status: "Sent to SAP" })
-            .then((res: any) => {
-              console.log("Success: ", res);
-              if (!res.data.error) {
-                setOriginalData(data);
-                setData({
-                  ...data,
-                  _status: "Sent to SAP",
-                });
-              }
-            })
-            .catch((e: any) => {
-              console.log("Error: ", e.message);
-              setLoading(false);
-            });
-          showNotification({
-            title: res.data.message,
-            type: "success",
-          });
-        } else {
-          showNotification({
-            title: res.data.message || "Can not send to SAP!",
-            type: "error",
-          });
-        }
-      })
-      .catch((e: any) => {
-        console.log("Error Send To SAP: ", e.message);
-        setLoading(false);
-      });
-
-    setLoading(false);
+  const handleSaveInvoice = async () => {
+    // setLoading(true);
+    // try {
+    //   const res = await axios(
+    //     process.env.NEXT_PUBLIC_API_URL + "/api/v1/invoices/sendToSap",
+    //     {
+    //       headers: {
+    //         "Content-Type": "application/json",
+    //         Authorization: `Bearer ${Cookies.get("token")}`,
+    //       },
+    //       method: "POST",
+    //       data: JSON.stringify({ invoiceId: data._id, pdf }),
+    //     }
+    //   );
+    //   if (!res.data.error) {
+    //     try {
+    //       const ress = await axios(
+    //         process.env.NEXT_PUBLIC_API_URL + "/api/v1/invoices" + data._id,
+    //         {
+    //           headers: {
+    //             "Content-Type": "application/json",
+    //             Authorization: `Bearer ${Cookies.get("token")}`,
+    //           },
+    //           method: "PUT",
+    //           data: JSON.stringify({ data, _status: "Sent to SAP" }),
+    //         }
+    //       );
+    //       if (!ress.data.error) {
+    //         setOriginalData(data);
+    //         setData({
+    //           ...data,
+    //           _status: "Sent to SAP",
+    //         });
+    //       }
+    //       showNotification({
+    //         title: ress.data.message,
+    //         type: "success",
+    //       });
+    //     } catch (error) {
+    //       setLoading(false);
+    //     }
+    //   } else {
+    //     showNotification({
+    //       title: res.data.message || "Can not send to SAP!",
+    //       type: "error",
+    //     });
+    //   }
+    // } catch (error) {
+    //   setLoading(false);
+    // }
+    // setLoading(false);
+    //   request
+    //     .post("/invoice/sendToSap", { invoiceId: data._id, pdf })
+    //     .then((res: any) => {
+    //       if (!res.data.error) {
+    //         request
+    //           .put("/invoice/" + data._id, { data, _status: "Sent to SAP" })
+    //           .then((res: any) => {
+    //             console.log("Success: ", res);
+    //             if (!res.data.error) {
+    //               setOriginalData(data);
+    //               setData({
+    //                 ...data,
+    //                 _status: "Sent to SAP",
+    //               });
+    //             }
+    //           })
+    //           .catch((e: any) => {
+    //             console.log("Error: ", e.message);
+    //             setLoading(false);
+    //           });
+    //         showNotification({
+    //           title: res.data.message,
+    //           type: "success",
+    //         });
+    //       } else {
+    //         showNotification({
+    //           title: res.data.message || "Can not send to SAP!",
+    //           type: "error",
+    //         });
+    //       }
+    //     })
+    //     .catch((e: any) => {
+    //       console.log("Error Send To SAP: ", e.message);
+    //       setLoading(false);
+    //     });
+    //   setLoading(false);
   };
 
-  const handleDeleteInvoice = (id: any) => {
+  const handleDeleteInvoice = async (id: any) => {
     const noti = confirm("Do you want to remove invoices?");
     if (noti) {
       setDeleting(true);
-      request
-        .delete("/invoice/" + id)
-        .then((res: any) => {
-          if (!res.data.error) {
-            setDeleting(false);
-            navigate("/invoices");
+      try {
+        const data = await axios(
+          process.env.NEXT_PUBLIC_API_URL + "/api/v1/invoices/" + id,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Cookies.get("token")}`,
+            },
+            method: "DELETE",
           }
-        })
-        .catch((e: any) => {
-          setDeleting(false);
-          console.log("Error Delete: ", e.message);
-        });
+        );
+        console.log(data);
+
+        setDeleting(false);
+        router.push("/invoices");
+      } catch (error) {
+        setDeleting(false);
+      }
+
+      // request
+      //   .delete("/invoice/" + id)
+      //   .then((res: any) => {
+      //     if (!res.data.error) {
+      //       setDeleting(false);
+      //       navigate("/invoices");
+      //     }
+      //   })
+      //   .catch((e: any) => {
+      //     setDeleting(false);
+      //     console.log("Error Delete: ", e.message);
+      //   });
     }
   };
 
@@ -493,7 +627,7 @@ const Detail = ({
                 <Grid container padding={"1.5rem"}>
                   <Grid item xs={6}>
                     <Box className="[&>img]:h-[80px]">
-                      <Image alt="logo" width={80} height={80} src={logo.src} />
+                      <img alt="logo" src={logo.src} />
                     </Box>
                   </Grid>
                   <Grid
@@ -611,10 +745,10 @@ const Detail = ({
             <Box className="flex justify-between">
               <Box>
                 <Button disabled={!data.prevId}>
-                  <Link to={"/invoices" + `/${data.prevId}`}>Previous</Link>
+                  <Link href={"/invoices" + `/${data.prevId}`}>Previous</Link>
                 </Button>
                 <Button disabled={!data.nextId}>
-                  <Link to={"/invoices" + `/${data.nextId}`}>Next</Link>
+                  <Link href={"/invoices" + `/${data.nextId}`}>Next</Link>
                 </Button>
               </Box>
               <Box className="flex gap-x-2 justify-end mr-5 pb-[20px] flex-wrap gap-y-[10px]">
@@ -648,6 +782,7 @@ const Detail = ({
                 <Button
                   variant="contained"
                   color="error"
+                  className="bg-red-500"
                   disabled={deleting}
                   onClick={() => handleDeleteInvoice(id)}
                 >
@@ -655,6 +790,7 @@ const Detail = ({
                 </Button>
                 {data._status === "PENDING" ? (
                   <Button
+                    className="bg-blue-500"
                     variant="contained"
                     onClick={handleSaveInvoice}
                     disabled={loading}

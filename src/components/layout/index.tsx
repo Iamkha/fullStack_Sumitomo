@@ -29,8 +29,7 @@ import {
   setUserInfo,
 } from "../features/user/userSlice";
 import { RootState } from "@/app/store";
-import { getRequest } from "../utils/axios";
-import { USER_INFO_ENDPOINT } from "../utils/endpoint";
+
 import Link from "next/link";
 import axios from "axios";
 
@@ -72,12 +71,8 @@ const Drawer = styled(MuiDrawer, {
 
 const mdTheme = createTheme();
 
-function Layout({ pathname, children }: any) {
+function Layout({ pathname, children, open, setOpen }: any) {
   const router = useRouter();
-  const [open, setOpen] = React.useState(
-    Cookies.get("showDrawer") === "1" ? true : false
-  );
-  console.log(open);
 
   const toggleDrawer = () => {
     Cookies.set("showDrawer", !open ? "1" : "0");
@@ -88,7 +83,6 @@ function Layout({ pathname, children }: any) {
   const token = useSelector((state: RootState) => state.user.token);
   const userInfo = useSelector((state: RootState) => state.user.userInfo);
   const dispatch = useDispatch();
-  const request = getRequest();
   const title: any = React.useMemo(() => {
     if (pathname.split("/")[1]) {
       if (pathname.split("/")[1] == "invoices") {
@@ -109,21 +103,22 @@ function Layout({ pathname, children }: any) {
 
   const fetchAPi = async () => {
     try {
-      const data: any = await axios("api/v1/user/info", {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${Cookies.get("token")}`,
-        },
-        method: "GET",
-      });
+      const data: any = await axios(
+        process.env.NEXT_PUBLIC_API_URL + "/api/v1/user/info",
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Cookies.get("token")}`,
+          },
+          method: "GET",
+        }
+      );
       if (data) {
-        // setData(data.data.data);
         dispatch(setUserInfo(data.data.data));
         dispatch(setUserId(data.data.data?._id || ""));
       }
     } catch (e: any) {
       handleSignout();
-      (err: any) => console.log("Error Dasboard: " + err);
     }
   };
 

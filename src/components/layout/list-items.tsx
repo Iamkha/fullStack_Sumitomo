@@ -104,7 +104,7 @@ const ListItems = (pathname: any) => {
                 ) : (
                   <Link href={item.url}>
                     <div>
-                      {item.url} {item.label}dsakjdbaskj
+                      {item.url} {item.label}
                     </div>
                     <Item
                       pathname={pathname}

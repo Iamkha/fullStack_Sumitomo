@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 
 export const GET = async (request: Request) => {
+  console.log(request.headers.get("authorization"), "kha");
+
   try {
     await connectToDB();
     const user: any = jwt.decode(

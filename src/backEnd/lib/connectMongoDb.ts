@@ -28,3 +28,5 @@ export const connectToDB = async () => {
     console.log(error);
   }
 };
+
+export const connectionString = process.env.MONGO_URL;

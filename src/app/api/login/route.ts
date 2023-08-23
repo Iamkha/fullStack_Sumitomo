@@ -41,7 +41,9 @@ export const POST = async (request: Request) => {
       {
         error: false,
         message: "success",
-        token: jwt.sign(info, process.env.JWT_SECRET || ""),
+        token: jwt.sign(info, process.env.JWT_SECRET || "", {
+          expiresIn: "7d",
+        }),
         info,
       },
       {

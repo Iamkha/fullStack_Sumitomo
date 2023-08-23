@@ -34,6 +34,9 @@ const Block = styled(Paper)(({ color }: any) => ({
 }));
 
 const Home = () => {
+  const [open, setOpen] = React.useState(
+    Cookies.get("showDrawer") === "1" ? true : false
+  );
   const param = useParams();
 
   const statusDrawer = useSelector(
@@ -90,7 +93,7 @@ const Home = () => {
 
   return (
     <div>
-      <Layout pathname={"/"}>
+      <Layout open={open} setOpen={setOpen} pathname={"/"}>
         <Box style={{ marginTop: "30px" }}>
           <Accordion sx={{ marginBottom: "16px" }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>

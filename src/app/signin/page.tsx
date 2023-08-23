@@ -90,7 +90,7 @@ export default function SignIn() {
             onSubmit={async (values, { setSubmitting }) => {
               setSubmitting(true);
               try {
-                const data = await axios("/api/login", {
+                const data: any = await axios("/api/login", {
                   headers: {
                     "Content-Type": "application/json",
                   },
